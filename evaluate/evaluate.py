@@ -1,21 +1,11 @@
 import os
-from fire import Fire
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-from model import get_model
-from utils.file_utils import load_config
-from utils.to_utils import DictToObject
-
-def load_checkpoint(config_name: str, checkpoint_folder: str):
-    candidate_file = os.path.join(checkpoint_folder, config_name + '.pt')
-    print(candidate_file)
-    if os.path.exists(candidate_file):
-        return torch.load(candidate_file)
-    raise FileNotFoundError
+from model.model import load_model_from_checkpoint
+from utils.config import TrainConfig
 
 def evaluate_sample(config, model, sample: np.ndarray):
     channel_size = 6
@@ -35,18 +25,5 @@ def evaluate_sample(config, model, sample: np.ndarray):
             if confidence > confidence_threshold:
                 print(gesture_id, config.labels[gesture_id])
 
-def evaluate(config: str, sample: str, checkpoint: str = './checkpoints/gesture/'):
-    config_path = config
-    config_name = config_path.strip().split('/')[-1].split('.')[0]
-    config = DictToObject(load_config(config))
-    setattr(config, 'num_classes', len(config.use_labels))
-    model = get_model(config)
-    if os.path.isfile(checkpoint):
-        model.load_state_dict(torch.load(checkpoint))
-    else:
-        model.load_state_dict(load_checkpoint(config_name, checkpoint))
-    if os.path.isfile(sample):
-        evaluate_sample(config, model, np.load(sample).astype(np.float32))
-
-if __name__ == '__main__':
-    Fire(evaluate)
+def evaluate(config: str, checkpoint: str = './checkpoints/gesture/'):
+    model = load_model_from_checkpoint(TrainConfig.from_yaml(config), torch.load(checkpoint))

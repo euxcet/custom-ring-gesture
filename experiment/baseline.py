@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -15,51 +21,60 @@ from lightning.pytorch.callbacks import (
     ModelCheckpoint,
 )
 
-from torchmetrics.classification import Accuracy
+from torchmetrics.classification import Accuracy, F1Score, ConfusionMatrix
 
-from dataset.gesture_dataset import GestureDataset
-from model import get_model
-from utils.config import TrainConfig
+from model import get_model, use_pretrained_model
+from dataset.exp_baseline_dataset import ExpBaselineDataset
+from utils.config import ExpBaselineTrainConfig
 
 torch.set_float32_matmul_precision("medium")
 
-def get_use_labels_id(labels: list[str], use_labels: list[str]) -> list[int]:
-    use_labels_id = []
-    for v_label in use_labels:
-        for i, label in enumerate(labels):
-            if v_label == label:
-                use_labels_id.append(i)
-                break
-    return use_labels_id
+def get_labels_id(labels: list[str], use_labels: list[str]) -> list[int]:
+    return [labels.index(label) for label in use_labels]
 
-class GestureDataModule(LightningDataModule):
-    def __init__(self, config: TrainConfig):
+class ExpBaselineDataModule(LightningDataModule):
+    def __init__(self, config: ExpBaselineTrainConfig):
         super().__init__()
-        use_labels_id = get_use_labels_id(config.labels, config.use_labels)
-        self.batch_size = config.batch_size
-        self.train_dataset = GestureDataset(config.train_x_files, config.train_y_files, use_labels_id)
-        self.valid_dataset = GestureDataset(config.valid_x_files, config.valid_y_files, use_labels_id)
+        custom_labels_id = get_labels_id(config.labels, config.custom_labels)
+        self.config = config
+        self.train_dataset = ExpBaselineDataset(
+            dataset_type='train',
+            x_files=config.train_x_files,
+            y_files=config.train_y_files,
+            custom_labels_id=custom_labels_id,
+            custom_num_samples=config.custom_num_samples,
+        )
+        self.valid_dataset = ExpBaselineDataset(
+            dataset_type='valid',
+            x_files=config.valid_x_files,
+            y_files=config.valid_y_files,
+            custom_labels_id=custom_labels_id,
+        )
     
     def setup(self, stage):
         ...
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=8, shuffle=True, persistent_workers=True)
+        return DataLoader(self.train_dataset, batch_size=self.config.batch_size, num_workers=8, shuffle=True, persistent_workers=True)
 
     def val_dataloader(self):
-        return DataLoader(self.valid_dataset, batch_size=self.batch_size, num_workers=8, shuffle=False, persistent_workers=True)
+        return DataLoader(self.valid_dataset, batch_size=self.config.batch_size, num_workers=8, shuffle=False, persistent_workers=True)
 
-class GestureModule(LightningModule):
-    def __init__(self, config: TrainConfig, weight: torch.Tensor):
+class ExpBaselineModule(LightningModule):
+    def __init__(self, config: ExpBaselineTrainConfig, weight: torch.Tensor):
         super().__init__()
         self.config = config
         self.model = get_model(config)
+        if config.use_pretrained_model:
+            self.model = use_pretrained_model(self.model, config)
         self.accuracy = Accuracy(task="multiclass", num_classes=config.num_classes)
         if config.balance_samples:
             self.criterion = nn.CrossEntropyLoss(weight=weight)
         else:
             self.criterion = nn.CrossEntropyLoss()
-
+        
+        self.num_custom_labels = len(config.custom_labels)
+        
     def training_step(self, batch: tuple[torch.Tensor, torch.Tensor]):
         x, y = batch
         output = self.model(x)
@@ -79,7 +94,7 @@ class GestureModule(LightningModule):
         self.log(f'valid loss', loss, prog_bar=True, sync_dist=True)
         self.log(f'valid accuracy', acc, prog_bar=True, sync_dist=True)
         return loss
-
+    
     def configure_optimizers(self) -> optim.Optimizer:
         optimizer = optim.Adam(self.parameters(), lr=self.config.lr, eps=self.config.eps)
         return optimizer
@@ -89,9 +104,9 @@ def setdefault(config, attr, value) -> None:
         setattr(config, attr, value)
 
 def train(config: str):
-    config: TrainConfig = TrainConfig.from_yaml(config)
-    data_module = GestureDataModule(config)
-    gesture_module = GestureModule(config, weight=data_module.train_dataset.weight)
+    config: ExpBaselineTrainConfig = ExpBaselineTrainConfig.from_yaml(config)
+    data_module = ExpBaselineDataModule(config)
+    gesture_module = ExpBaselineModule(config, weight=data_module.train_dataset.weight)
     logger = TensorBoardLogger("tb_logs", name=config.name)
     trainer = Trainer(
         accelerator='gpu',
@@ -103,3 +118,6 @@ def train(config: str):
     )
     tuner = Tuner(trainer)
     trainer.fit(model=gesture_module, datamodule=data_module)
+
+if __name__ == '__main__':
+    Fire(train)
