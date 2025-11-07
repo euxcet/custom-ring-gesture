@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import random
 from torch.utils.data import Dataset
+from dataset.gesture_augmentor import GestureAugmentor
 
 class ExpBaselineDataset(Dataset):
     def __init__(
@@ -11,8 +12,11 @@ class ExpBaselineDataset(Dataset):
         y_files: list[str],
         custom_labels_id: list[int],
         custom_num_samples: list[int] = None,
+        do_aug: bool = False,
     ) -> None:
         self.num_classes = len(custom_labels_id)
+        self.do_aug = do_aug
+        self.augmentor = GestureAugmentor() if do_aug else None
 
         self.xs, self.ys = self.load_from_files(x_files, y_files)
         if dataset_type == 'train':
@@ -21,6 +25,9 @@ class ExpBaselineDataset(Dataset):
             self.xs, self.ys = self.filter_data(self.xs, self.ys, custom_labels_id, keep_index=False)
         else:
             self.xs, self.ys = self.filter_data(self.xs, self.ys, custom_labels_id, keep_index=False)
+
+        self.xs, self.ys = self.augment_data(self.xs, self.ys, 7000)
+        # self.xs, self.ys = self.augment_data(self.xs, self.ys, 10)
 
         self.weight = self.get_weight(self.ys)
         self.length = self.xs.shape[0]
@@ -73,8 +80,33 @@ class ExpBaselineDataset(Dataset):
         weights = np.divide(w_max, counts, out=np.zeros_like(counts, dtype=float), where=counts>0)
         return torch.FloatTensor(weights)
 
+    def augment(self, x: np.ndarray) -> np.ndarray:
+        if self.augmentor is None:
+            return x
+        return self.augmentor(x)
+
+    def augment_data(self, xs: np.ndarray, ys: np.ndarray, num_samples: int) -> tuple[np.ndarray, np.ndarray]:
+        if not self.do_aug or self.augmentor is None:
+            return xs, ys
+
+        augmented_xs = list()
+        augmented_ys = list()
+        for i in range(len(ys)):
+            if ys[i] != 0:
+                for j in range(num_samples):
+                    augmented_sample = self.augment(xs[i])
+                    augmented_xs.append(augmented_sample)
+                    augmented_ys.append(ys[i])
+            else:
+                augmented_xs.append(xs[i])
+                augmented_ys.append(ys[i])
+
+        return np.array(augmented_xs), np.array(augmented_ys)
+
     def __len__(self) -> int:
         return self.length
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        # if self.do_aug:
+        #     return self.augment(self.xs[index]), self.ys[index]
         return self.xs[index], self.ys[index]

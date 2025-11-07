@@ -109,6 +109,7 @@ class ExpBaselineTrainConfig:
         labels: list[str],
         custom_labels: list[str],
         custom_num_samples: int,
+        do_aug: bool,
     ) -> None:
         self.name = name
         self.model = model
@@ -126,6 +127,7 @@ class ExpBaselineTrainConfig:
         self.use_pretrained_model = use_pretrained_model
         self.custom_labels = custom_labels
         self.custom_num_samples = custom_num_samples
+        self.do_aug = do_aug
         self.num_classes = len(custom_labels)
 
     @staticmethod

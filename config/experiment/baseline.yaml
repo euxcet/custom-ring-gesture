@@ -1,11 +1,11 @@
-name: exp_baseline
+name: exp_baseline_senselitev2
 
 model:
-  name: InceptionTimeModel
+  name: SenseLiteV2
   input_channels: 6
   depth: 6
 
-lr: 1e-4
+lr: 1e-3
 eps: 1e-8
 device: 'mps'
 batch_size: 256
@@ -14,6 +14,7 @@ train_x_files: ['/data2-HDD-SATA-20T/zcc/dataset/gesture_merged/train_x.npy']
 train_y_files: ['/data2-HDD-SATA-20T/zcc/dataset/gesture_merged/train_y.npy']
 valid_x_files: ['/data2-HDD-SATA-20T/zcc/dataset/gesture_merged/test_x.npy']
 valid_y_files: ['/data2-HDD-SATA-20T/zcc/dataset/gesture_merged/test_y.npy']
+
 labels: [ none, wave_right, wave_down, wave_left, wave_up, tap_air, tap_plane, push_forward,
         pinch, clench, flip, wrist_clockwise, wrist_counterclockwise, circle_clockwise,
         circle_counterclockwise, clap, snap, thumb_up, middle_pinch, index_flick, touch_plane,
@@ -23,7 +24,8 @@ labels: [ none, wave_right, wave_down, wave_left, wave_up, tap_air, tap_plane, p
         touch_down, touch_ring, long_touch_ring, spread_ring]
 
 custom_labels: [ none, pinch, middle_pinch, circle_clockwise, circle_counterclockwise, clap, snap ]
-custom_num_samples: [100000, 50, 50, 50, 50, 50, 50]
+custom_num_samples: [100000, 5, 5, 5, 5, 5, 5]
 # custom_num_samples: [100000, 500, 10, 10, 10, 10, 10]
-pretrained_checkpoint_path: './pretrained/pretrained.ckpt'
-use_pretrained_model: True
+pretrained_checkpoint_path: './pretrained/pretrained_senselitev2.ckpt'
+use_pretrained_model: False
+do_aug: True

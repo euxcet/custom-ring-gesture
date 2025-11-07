@@ -1,8 +1,9 @@
 import os
 import numpy as np
 import torch
-import random
 from torch.utils.data import Dataset
+
+from dataset.gesture_augmentor import GestureAugmentor
 
 # 0 none 1 wave_right 2 wave_down 3 wave_left 4 wave_up 5 tap_air
 # 6 tap_plane 7 push_forward 8 pinch 9 clench 10 flip 11 wrist_clockwise
@@ -13,11 +14,13 @@ from torch.utils.data import Dataset
 # 34 slide_down 35 slide_left 36 slide_right 37 aid_slide_left 38 aid_slide_right 39 touch_up
 # 40 touch_down 41 touch_ring 42 long_touch_ring 43 spread_ring
 
+
 class GestureDataset(Dataset):
     def __init__(self, x_files: list[str], y_files: list[str], valid: list[int], do_aug: bool = False) -> None:
         self.do_aug = do_aug
         self.xs = None
         self.ys = None
+        self.augmentor = GestureAugmentor() if do_aug else None
         for x_f, y_f in zip(x_files, y_files):
             x: np.ndarray = np.load(x_f).astype(np.float32)
             y: np.ndarray = np.load(y_f).astype(np.long)
@@ -45,6 +48,22 @@ class GestureDataset(Dataset):
         self.xs = np.array(after_xs)
         self.ys = np.array(after_ys)
 
+        # gesture_labels = [
+        #     'none', 'wave_right', 'wave_down', 'wave_left', 'wave_up', 'tap_air', 'tap_plane', 'push_forward',
+        #     'pinch', 'clench', 'flip', 'wrist_clockwise', 'wrist_counterclockwise', 'circle_clockwise',
+        #     'circle_counterclockwise', 'clap', 'snap', 'thumb_up', 'middle_pinch', 'index_flick', 'touch_plane',
+        #     'thumb_tap_index', 'index_bend_and_straighten', 'ring_pinch', 'pinky_pinch', 'slide_plane',
+        #     'pinch_down', 'pinch_up', 'boom', 'tap_up', 'throw', 'touch_left', 'touch_right', 'slide_up',
+        #     'slide_down', 'slide_left', 'slide_right', 'aid_slide_left', 'aid_slide_right', 'touch_up',
+        #     'touch_down', 'touch_ring', 'long_touch_ring', 'spread_ring'
+        # ]
+
+        # print("weight:", self.weight)
+        # for i in range(len(self.weight)):
+        #     print(gesture_labels[i], self.weight[i])
+
+        # exit(0)
+
         # get weights for balancing
         w_min = 100000000
         for i in range(len(self.weight)):
@@ -61,28 +80,9 @@ class GestureDataset(Dataset):
         print('Length of the dataset:', self.length)
 
     def augment(self, x: np.ndarray) -> np.ndarray:
-        peak_v = 0
-        peak_i = 0
-        for i in range(200):
-            v = x[0][i] * x[0][i] + x[1][i] * x[1][i] + x[2][i] * x[2][i]
-            if v > peak_v:
-                peak_v = v
-                peak_i = i
-
-        # # mask
-        # if random.randint(0, 1) == 1:
-        #     for i in range(10):
-        #         t = random.randint(0, 199)
-        #         for j in range(6):
-        #             x[j][t] = 0
-
-        # shift
-        t = random.randint(0, 199)
-        while abs(t - peak_i) < 30:
-            t = random.randint(0, 199)
-
-        x = np.concatenate((x[:, t:], x[:, :t]), axis=1)
-        return x
+        if self.augmentor is None:
+            return x
+        return self.augmentor(x)
 
     def __len__(self):
         return self.length

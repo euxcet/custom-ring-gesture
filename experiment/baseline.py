@@ -27,7 +27,7 @@ from model import get_model, use_pretrained_model
 from dataset.exp_baseline_dataset import ExpBaselineDataset
 from utils.config import ExpBaselineTrainConfig
 
-torch.set_float32_matmul_precision("medium")
+# torch.set_float32_matmul_precision("medium")
 
 def get_labels_id(labels: list[str], use_labels: list[str]) -> list[int]:
     return [labels.index(label) for label in use_labels]
@@ -43,6 +43,7 @@ class ExpBaselineDataModule(LightningDataModule):
             y_files=config.train_y_files,
             custom_labels_id=custom_labels_id,
             custom_num_samples=config.custom_num_samples,
+            do_aug=config.do_aug,
         )
         self.valid_dataset = ExpBaselineDataset(
             dataset_type='valid',
@@ -68,6 +69,10 @@ class ExpBaselineModule(LightningModule):
         if config.use_pretrained_model:
             self.model = use_pretrained_model(self.model, config)
         self.accuracy = Accuracy(task="multiclass", num_classes=config.num_classes)
+        self.train_micro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="micro")
+        self.train_macro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="macro")
+        self.valid_micro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="micro")
+        self.valid_macro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="macro")
         if config.balance_samples:
             self.criterion = nn.CrossEntropyLoss(weight=weight)
         else:
@@ -80,9 +85,13 @@ class ExpBaselineModule(LightningModule):
         output = self.model(x)
         loss = self.criterion(output, y)
         acc = self.accuracy(output, y)
+        micro_f1 = self.train_micro_f1(output, y)
+        macro_f1 = self.train_macro_f1(output, y)
 
         self.log(f'train loss', loss, prog_bar=True)
         self.log(f'train accuracy', acc, prog_bar=True, sync_dist=True)
+        self.log(f'train micro f1', micro_f1, prog_bar=False, sync_dist=True)
+        self.log(f'train macro f1', macro_f1, prog_bar=False, sync_dist=True)
         return loss
 
     def validation_step(self, batch: tuple[torch.Tensor, torch.Tensor]):
@@ -90,10 +99,18 @@ class ExpBaselineModule(LightningModule):
         output = self.model(x)
         loss = self.criterion(output, y)
         acc = self.accuracy(output, y)
+        micro_f1 = self.valid_micro_f1(output, y)
+        macro_f1 = self.valid_macro_f1(output, y)
 
         self.log(f'valid loss', loss, prog_bar=True, sync_dist=True)
         self.log(f'valid accuracy', acc, prog_bar=True, sync_dist=True)
+        self.log(f'valid micro f1', micro_f1, prog_bar=False, sync_dist=True)
+        self.log(f'valid macro f1', macro_f1, prog_bar=False, sync_dist=True)
         return loss
+
+    def on_validation_epoch_end(self):
+        self.valid_micro_f1.reset()
+        self.valid_macro_f1.reset()
     
     def configure_optimizers(self) -> optim.Optimizer:
         optimizer = optim.Adam(self.parameters(), lr=self.config.lr, eps=self.config.eps)

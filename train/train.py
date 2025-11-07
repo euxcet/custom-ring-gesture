@@ -15,7 +15,7 @@ from lightning.pytorch.callbacks import (
     ModelCheckpoint,
 )
 
-from torchmetrics.classification import Accuracy
+from torchmetrics.classification import Accuracy, F1Score, ConfusionMatrix
 
 from dataset.gesture_dataset import GestureDataset
 from model import get_model
@@ -54,7 +54,13 @@ class GestureModule(LightningModule):
         super().__init__()
         self.config = config
         self.model = get_model(config)
-        self.accuracy = Accuracy(task="multiclass", num_classes=config.num_classes)
+        self.train_accuracy = Accuracy(task="multiclass", num_classes=config.num_classes)
+        self.val_accuracy = Accuracy(task="multiclass", num_classes=config.num_classes)
+        self.train_micro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="micro")
+        self.val_micro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="micro")
+        self.train_macro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="macro")
+        self.val_macro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="macro")
+        self.confusion_matrix = ConfusionMatrix(task="multiclass", num_classes=config.num_classes)
         if config.balance_samples:
             self.criterion = nn.CrossEntropyLoss(weight=weight)
         else:
@@ -64,21 +70,47 @@ class GestureModule(LightningModule):
         x, y = batch
         output = self.model(x)
         loss = self.criterion(output, y)
-        acc = self.accuracy(output, y)
-
+        self.train_accuracy(output, y)
+        self.train_micro_f1(output, y)
+        self.train_macro_f1(output, y)
         self.log(f'train loss', loss, prog_bar=True)
-        self.log(f'train accuracy', acc, prog_bar=True, sync_dist=True)
+        self.log(f'train accuracy', self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f'train micro f1', self.train_micro_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f'train macro f1', self.train_macro_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         return loss
+
+    def on_train_epoch_end(self):
+        self.train_accuracy.reset()
+        self.train_micro_f1.reset()
+        self.train_macro_f1.reset()
 
     def validation_step(self, batch: tuple[torch.Tensor, torch.Tensor]):
         x, y = batch
         output = self.model(x)
         loss = self.criterion(output, y)
-        acc = self.accuracy(output, y)
+        self.val_accuracy(output, y)
+        self.val_micro_f1(output, y)
+        self.val_macro_f1(output, y)
+        preds = torch.argmax(output, dim=1)
+        self.confusion_matrix.update(preds, y)
 
         self.log(f'valid loss', loss, prog_bar=True, sync_dist=True)
-        self.log(f'valid accuracy', acc, prog_bar=True, sync_dist=True)
+        self.log(f'valid accuracy', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f'valid micro f1', self.val_micro_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f'valid macro f1', self.val_macro_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         return loss
+
+    def on_validation_epoch_end(self):
+        confusion = self.confusion_matrix.compute()
+        confusion_cpu = confusion.detach().cpu()
+        confusion_np = confusion_cpu.numpy()
+        with np.printoptions(threshold=np.inf, linewidth=1_000_000):
+            matrix_str = np.array2string(confusion_np, separator=" ")
+        self.print(f"\nValidation confusion matrix:\n{matrix_str}")
+        self.confusion_matrix.reset()
+        self.val_accuracy.reset()
+        self.val_micro_f1.reset()
+        self.val_macro_f1.reset()
 
     def configure_optimizers(self) -> optim.Optimizer:
         optimizer = optim.Adam(self.parameters(), lr=self.config.lr, eps=self.config.eps)
@@ -93,6 +125,7 @@ def train(config: str):
     data_module = GestureDataModule(config)
     gesture_module = GestureModule(config, weight=data_module.train_dataset.weight)
     logger = TensorBoardLogger("tb_logs", name=config.name)
+    print("Number of classes:", config.num_classes)
     trainer = Trainer(
         accelerator='gpu',
         devices=1,

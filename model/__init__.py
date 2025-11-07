@@ -4,6 +4,7 @@ from utils.config import TrainConfig, ExpBaselineTrainConfig
 from copy import deepcopy
 
 from .model import InceptionTimeModel, InceptionTimeMoreFcModel
+from .sense_lite_v2 import SenseLiteV2
 
 def get_model(config) -> nn.Module:
     if config.model.name == 'InceptionTimeModel':
@@ -17,6 +18,17 @@ def get_model(config) -> nn.Module:
             input_channels=config.model.input_channels,
             num_classes=config.num_classes,
             depth=config.model.depth,
+        )
+    elif config.model.name == 'SenseLiteV2':
+        return SenseLiteV2(
+            input_len=200,
+            input_dim=config.model.input_channels,
+            output_dim=config.num_classes,
+            conv_dim=[96, 96, 96],
+            dropout=0.1,
+            fc_dim=256,
+            sca_reduction=8,
+            n_input_filters=32,
         )
 
 def load_model_from_checkpoint(config: TrainConfig, checkpoint: dict) -> nn.Module:
@@ -39,7 +51,7 @@ def load_model_from_checkpoint(config: TrainConfig, checkpoint: dict) -> nn.Modu
 
 def use_pretrained_model(model: nn.Module, config: ExpBaselineTrainConfig) -> nn.Module:
     pretrained_config = deepcopy(config)
-    pretrained_config.num_classes = 44 - 6
+    pretrained_config.num_classes = 27
     pretrained_model = load_model_from_checkpoint(pretrained_config, torch.load(config.pretrained_checkpoint_path))
     
     pretrained_state_dict = pretrained_model.state_dict()

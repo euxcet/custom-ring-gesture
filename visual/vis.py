@@ -1,18 +1,14 @@
+import sys
+from pathlib import Path
+
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
 import matplotlib.pyplot as plt
-from dataset import GestureDataset
+from utils.config import ExpBaselineTrainConfig
+from dataset.exp_baseline_dataset import ExpBaselineDataset
 
-# 0 none 1 wave_right 2 wave_down 3 wave_left 4 wave_up 5 tap_air
-# 6 tap_plane 7 push_forward 8 pinch 9 clench 10 flip 11 wrist_clockwise
-# 12 wrist_counterclockwise 13 circle_clockwise 14 circle_counterclockwise 15 clap 16 snap
-# 17 thumb_up 18 middle_pinch 19 index_flick 20 touch_plane 21 thumb_tap_index
-# 22 index_bend_and_straighten 23 ring_pinch 24 pinky_pinch 25 slide_plane 26 pinch_down
-# 27 pinch_up 28 boom 29 tap_up 30 throw 31 touch_left 32 touch_right 33 slide_up
-# 34 slide_down 35 slide_left 36 slide_right 37 aid_slide_left 38 aid_slide_right 39 touch_up
-# 40 touch_down 41 touch_ring 42 long_touch_ring 43 spread_ring
-
-def visual(x):
-    # fig, ax = plt.subplots(figsize=(12, 6))
-
+def visual(x, filename: str):
     plt.figure(figsize=(12, 6))
 
     plt.subplot(2, 1, 1)
@@ -32,18 +28,22 @@ def visual(x):
     plt.legend()
 
     plt.tight_layout()
-    plt.show()
-    # for i in range(x.shape[0]):
-    #     ax.plot(x[i], label=f'Line {i+1}')
+    plt.savefig(filename)
+    plt.close()
 
-    # ax.set_title('Line Plots for 6x200 Array')
-    # ax.set_xlabel('Index (Columns)')
-    # ax.set_ylabel('Value')
-    # ax.legend()
-    # plt.show()
+def get_labels_id(labels: list[str], use_labels: list[str]) -> list[int]:
+    return [labels.index(label) for label in use_labels]
 
-dataset = GestureDataset(valid = [0, 5, 6, 8, 16])
+if __name__ == '__main__':
+    config = ExpBaselineTrainConfig.from_yaml('config/experiment/baseline.yaml')
 
-for x, y in dataset:
-    if y == 3:
-        visual(x)
+    custom_labels_id = get_labels_id(config.labels, config.custom_labels)
+    dataset = ExpBaselineDataset(dataset_type='valid', x_files=config.valid_x_files, y_files=config.valid_y_files, custom_labels_id=custom_labels_id, do_aug=config.do_aug)
+
+    for i, (x, y) in enumerate(dataset):
+        if y == 1:
+            # print(y)
+            visual(x, f'visual_result/visual_{i}.png')
+            for r in range(5):
+                visual(dataset.augment(x), f'visual_result/visual_{i}_augment_{r}.png')
+            break
