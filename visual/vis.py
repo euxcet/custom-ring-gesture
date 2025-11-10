@@ -1,12 +1,14 @@
 import sys
 from pathlib import Path
 
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+if __name__ == '__main__':
+    project_root = Path(__file__).parent.parent
+    sys.path.insert(0, str(project_root))
 
 import matplotlib.pyplot as plt
 from utils.config import ExpBaselineTrainConfig
 from dataset.exp_baseline_dataset import ExpBaselineDataset
+from utils.train_utils import get_labels_id
 
 def visual(x, filename: str):
     plt.figure(figsize=(12, 6))
@@ -30,9 +32,6 @@ def visual(x, filename: str):
     plt.tight_layout()
     plt.savefig(filename)
     plt.close()
-
-def get_labels_id(labels: list[str], use_labels: list[str]) -> list[int]:
-    return [labels.index(label) for label in use_labels]
 
 if __name__ == '__main__':
     config = ExpBaselineTrainConfig.from_yaml('config/experiment/baseline.yaml')

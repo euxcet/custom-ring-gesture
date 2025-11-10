@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import torch
+import random
 from torch.utils.data import Dataset
 
 from dataset.gesture_augmentor import GestureAugmentor
@@ -15,27 +16,39 @@ from dataset.gesture_augmentor import GestureAugmentor
 # 40 touch_down 41 touch_ring 42 long_touch_ring 43 spread_ring
 
 
-class GestureDataset(Dataset):
-    def __init__(self, x_files: list[str], y_files: list[str], use_labels_id: list[int], do_aug: bool = False, do_normalize: bool = False) -> None:
+class PairDataset(Dataset):
+    def __init__(
+        self,
+        x_files: list[str],
+        y_files: list[str],
+        use_labels_id: list[int],
+        do_aug: bool = False,
+        mean: np.ndarray = None,
+        std: np.ndarray = None,
+    ) -> None:
         self.do_aug = do_aug
-        self.do_normalize = do_normalize
         self.augmentor = GestureAugmentor() if do_aug else None
         self.num_classes = len(use_labels_id)
 
         self.xs, self.ys = self.load_from_files(x_files, y_files)
         self.xs, self.ys = self.filter_data(self.xs, self.ys, use_labels_id, keep_index=False)
 
+        self.groups = self.get_groups(self.xs, self.ys)
         self.weight = self.get_weight(self.ys)
-        self.length = self.xs.shape[0]
-        if do_normalize:
-            self.mean = self.xs.mean(axis=(0, 2))
-            self.std = self.xs.std(axis=(0, 2)) + 1e-8
-            print("mean:", self.mean)
-            print("std:", self.std)
 
+        self.mean = mean
+        self.std = std
+
+        self.length = self.xs.shape[0]
         print('Weight:', self.weight)
         print('The shape of xs:', self.xs.shape)
         print('Length of the dataset:', self.length)
+
+    def get_groups(self, xs: np.ndarray, ys: np.ndarray) -> list[np.ndarray]:
+        groups = [[] for i in range(self.num_classes)]
+        for i in range(len(ys)):
+            groups[ys[i]].append(xs[i])
+        return groups
 
     def load_from_files(self, x_files: list[str], y_files: list[str]) -> tuple[np.ndarray, np.ndarray]:
         # merge all x and y
@@ -74,9 +87,9 @@ class GestureDataset(Dataset):
         return self.length
 
     def __getitem__(self, index: int):
-        x = self.xs[index]
-        if self.do_normalize:
-            x = (x - self.mean[:, None]) / self.std[:, None]
-        if self.do_aug:
-            return self.augment(x), self.ys[index]
-        return x, self.ys[index]
+        group_index = random.randint(0, len(self.groups) - 1)
+        group = self.groups[group_index]
+        x_i, x_j = random.sample(group, 2)
+        x_i = (x_i - self.mean[:, None]) / self.std[:, None]
+        x_j = (x_j - self.mean[:, None]) / self.std[:, None]
+        return x_i, x_j

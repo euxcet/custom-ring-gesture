@@ -20,22 +20,14 @@ from torchmetrics.classification import Accuracy, F1Score, ConfusionMatrix
 from dataset.gesture_dataset import GestureDataset
 from model import get_model
 from utils.config import TrainConfig
+from utils.train_utils import get_labels_id
 
 torch.set_float32_matmul_precision("medium")
-
-def get_use_labels_id(labels: list[str], use_labels: list[str]) -> list[int]:
-    use_labels_id = []
-    for v_label in use_labels:
-        for i, label in enumerate(labels):
-            if v_label == label:
-                use_labels_id.append(i)
-                break
-    return use_labels_id
 
 class GestureDataModule(LightningDataModule):
     def __init__(self, config: TrainConfig):
         super().__init__()
-        use_labels_id = get_use_labels_id(config.labels, config.use_labels)
+        use_labels_id = get_labels_id(config.labels, config.use_labels)
         self.batch_size = config.batch_size
         self.train_dataset = GestureDataset(config.train_x_files, config.train_y_files, use_labels_id)
         self.valid_dataset = GestureDataset(config.valid_x_files, config.valid_y_files, use_labels_id)

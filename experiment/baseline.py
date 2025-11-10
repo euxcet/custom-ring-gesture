@@ -26,11 +26,9 @@ from torchmetrics.classification import Accuracy, F1Score, ConfusionMatrix
 from model import get_model, use_pretrained_model
 from dataset.exp_baseline_dataset import ExpBaselineDataset
 from utils.config import ExpBaselineTrainConfig
+from utils.train_utils import get_labels_id
 
 # torch.set_float32_matmul_precision("medium")
-
-def get_labels_id(labels: list[str], use_labels: list[str]) -> list[int]:
-    return [labels.index(label) for label in use_labels]
 
 class ExpBaselineDataModule(LightningDataModule):
     def __init__(self, config: ExpBaselineTrainConfig):
@@ -44,6 +42,10 @@ class ExpBaselineDataModule(LightningDataModule):
             custom_labels_id=custom_labels_id,
             custom_num_samples=config.custom_num_samples,
             do_aug=config.do_aug,
+            do_vae_aug=config.do_vae_aug,
+            vae_model_path=config.vae_model_path,
+            vae_latent_dim=config.vae_latent_dim,
+            do_repeat=config.do_repeat,
         )
         self.valid_dataset = ExpBaselineDataset(
             dataset_type='valid',

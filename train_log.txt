@@ -1,0 +1,55 @@
+exp_baseline_senselitev2/version_33 0.527
+use_pretrained_model: False
+do_aug: False
+do_vae_aug: True
+vae_model_path: './vae_logs/vae_1dcnn_lat128.pt'
+vae_latent_dim: 128
+
+
+exp_baseline_senselitev2/version_34
+use_pretrained_model: False
+do_aug: True
+do_vae_aug: False
+vae_model_path: './vae_logs/vae_1dcnn_lat128.pt'
+vae_latent_dim: 128
+
+
+exp_baseline_senselitev2/version_35, 45,46,47 0.64
+use_pretrained_model: True
+do_aug: True
+do_vae_aug: False
+vae_model_path: './vae_logs/vae_1dcnn_lat128.pt'
+vae_latent_dim: 128
+
+
+exp_baseline_senselitev2/version_37,42,43,44 0.58
+use_pretrained_model: False
+do_aug: False
+do_vae_aug: False
+vae_model_path: './vae_logs/vae_1dcnn_lat128.pt'
+vae_latent_dim: 128
+
+
+exp_baseline_senselitev2/version_38,51,52,53 0.51
+use_pretrained_model: True
+do_aug: False
+do_vae_aug: True
+vae_model_path: './vae_logs/vae_1dcnn_lat128.pt'
+vae_latent_dim: 128
+
+
+exp_baseline_senselitev2/version_39,40,31 0.67
+use_pretrained_model: True
+do_aug: False
+do_vae_aug: False
+vae_model_path: './vae_logs/vae_1dcnn_lat128.pt'
+vae_latent_dim: 128
+
+
+exp_baseline_senselitev2/version_48,49,50 0.66
+use_pretrained_model: True
+do_aug: False
+do_vae_aug: False
+vae_model_path: './vae_logs/vae_1dcnn_lat128.pt'
+vae_latent_dim: 128
+do_repeat: True
