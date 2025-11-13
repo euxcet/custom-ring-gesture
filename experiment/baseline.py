@@ -23,7 +23,7 @@ from lightning.pytorch.callbacks import (
 
 from torchmetrics.classification import Accuracy, F1Score, ConfusionMatrix
 
-from model import get_model, use_pretrained_model
+from model import get_model, use_pretrained_model, freeze_model
 from dataset.exp_baseline_dataset import ExpBaselineDataset
 from utils.config import ExpBaselineTrainConfig
 from utils.train_utils import get_labels_id
@@ -70,7 +70,10 @@ class ExpBaselineModule(LightningModule):
         self.model = get_model(config)
         if config.use_pretrained_model:
             self.model = use_pretrained_model(self.model, config)
-        self.accuracy = Accuracy(task="multiclass", num_classes=config.num_classes)
+        if config.do_freeze_model:
+            self.model = freeze_model(self.model)
+        self.train_accuracy = Accuracy(task="multiclass", num_classes=config.num_classes)
+        self.valid_accuracy = Accuracy(task="multiclass", num_classes=config.num_classes)
         self.train_micro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="micro")
         self.train_macro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="macro")
         self.valid_micro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="micro")
@@ -86,31 +89,37 @@ class ExpBaselineModule(LightningModule):
         x, y = batch
         output = self.model(x)
         loss = self.criterion(output, y)
-        acc = self.accuracy(output, y)
-        micro_f1 = self.train_micro_f1(output, y)
-        macro_f1 = self.train_macro_f1(output, y)
+        self.train_accuracy(output, y)
+        self.train_micro_f1(output, y)
+        self.train_macro_f1(output, y)
 
         self.log(f'train loss', loss, prog_bar=True)
-        self.log(f'train accuracy', acc, prog_bar=True, sync_dist=True)
-        self.log(f'train micro f1', micro_f1, prog_bar=False, sync_dist=True)
-        self.log(f'train macro f1', macro_f1, prog_bar=False, sync_dist=True)
+        self.log(f'train accuracy', self.train_accuracy, prog_bar=True, sync_dist=True)
+        self.log(f'train micro f1', self.train_micro_f1, prog_bar=False, sync_dist=True)
+        self.log(f'train macro f1', self.train_macro_f1, prog_bar=False, sync_dist=True)
         return loss
+
+    def on_train_epoch_end(self):
+        self.train_accuracy.reset()
+        self.train_micro_f1.reset()
+        self.train_macro_f1.reset()
 
     def validation_step(self, batch: tuple[torch.Tensor, torch.Tensor]):
         x, y = batch
         output = self.model(x)
         loss = self.criterion(output, y)
-        acc = self.accuracy(output, y)
-        micro_f1 = self.valid_micro_f1(output, y)
-        macro_f1 = self.valid_macro_f1(output, y)
+        self.valid_accuracy(output, y)
+        self.valid_micro_f1(output, y)
+        self.valid_macro_f1(output, y)
 
         self.log(f'valid loss', loss, prog_bar=True, sync_dist=True)
-        self.log(f'valid accuracy', acc, prog_bar=True, sync_dist=True)
-        self.log(f'valid micro f1', micro_f1, prog_bar=False, sync_dist=True)
-        self.log(f'valid macro f1', macro_f1, prog_bar=False, sync_dist=True)
+        self.log(f'valid accuracy', self.valid_accuracy, prog_bar=True, sync_dist=True)
+        self.log(f'valid micro f1', self.valid_micro_f1, prog_bar=False, sync_dist=True)
+        self.log(f'valid macro f1', self.valid_macro_f1, prog_bar=False, sync_dist=True)
         return loss
 
     def on_validation_epoch_end(self):
+        self.valid_accuracy.reset()
         self.valid_micro_f1.reset()
         self.valid_macro_f1.reset()
     
@@ -130,7 +139,7 @@ def train(config: str):
     trainer = Trainer(
         accelerator='gpu',
         devices=1,
-        max_epochs=-1,
+        max_epochs=config.epoch,
         callbacks=[ ModelCheckpoint(every_n_epochs=20, save_top_k=1), ],
         default_root_dir='./log',
         logger=logger,

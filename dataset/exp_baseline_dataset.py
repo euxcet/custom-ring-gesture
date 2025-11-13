@@ -37,8 +37,8 @@ class ExpBaselineDataset(Dataset):
         else:
             self.xs, self.ys = self.filter_data(self.xs, self.ys, custom_labels_id, keep_index=False)
 
-        # if self.do_aug:
-        #     self.xs, self.ys = self.augment_data(self.xs, self.ys, 7000)
+        if self.do_aug:
+            self.xs, self.ys = self.augment_data(self.xs, self.ys, 7000)
         if self.do_vae_aug:
             self.xs, self.ys = self.vae_augment_data(self.xs, self.ys, 7000)
         if self.do_repeat:
@@ -175,8 +175,8 @@ class ExpBaselineDataset(Dataset):
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         x = self.xs[index]
-        if self.do_aug:
-            x = self.augment(x)
+        # if self.do_aug:
+        #     x = self.augment(x)
         # if self.do_vae_aug:
         #     x = self.vae_augment(x)
         return x, self.ys[index]

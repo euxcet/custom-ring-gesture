@@ -17,6 +17,7 @@ class TrainConfig:
         self,
         name: str,
         model: ModelConfig,
+        epoch: int,
         lr: float,
         eps: float,
         device: str,
@@ -31,6 +32,7 @@ class TrainConfig:
     ) -> None:
         self.name = name
         self.model = model
+        self.epoch = epoch
         self.lr = lr
         self.eps = eps
         self.device = device
@@ -95,6 +97,7 @@ class ExpBaselineTrainConfig:
         self,
         name: str,
         model: ModelConfig,
+        epoch: int,
         lr: float,
         eps: float,
         device: str,
@@ -114,9 +117,11 @@ class ExpBaselineTrainConfig:
         vae_model_path: str,
         vae_latent_dim: int,
         do_repeat: bool,
+        do_freeze_model: bool,
     ) -> None:
         self.name = name
         self.model = model
+        self.epoch = epoch
         self.lr = lr
         self.eps = eps
         self.device = device
@@ -137,6 +142,7 @@ class ExpBaselineTrainConfig:
         self.vae_latent_dim = vae_latent_dim
         self.num_classes = len(custom_labels)
         self.do_repeat = do_repeat
+        self.do_freeze_model = do_freeze_model
 
     @staticmethod
     def from_yaml(path: str) -> ExpBaselineTrainConfig:

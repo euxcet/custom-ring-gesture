@@ -47,11 +47,11 @@ class GestureModule(LightningModule):
         self.config = config
         self.model = get_model(config)
         self.train_accuracy = Accuracy(task="multiclass", num_classes=config.num_classes)
-        self.val_accuracy = Accuracy(task="multiclass", num_classes=config.num_classes)
+        self.valid_accuracy = Accuracy(task="multiclass", num_classes=config.num_classes)
         self.train_micro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="micro")
-        self.val_micro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="micro")
+        self.valid_micro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="micro")
         self.train_macro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="macro")
-        self.val_macro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="macro")
+        self.valid_macro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="macro")
         self.confusion_matrix = ConfusionMatrix(task="multiclass", num_classes=config.num_classes)
         if config.balance_samples:
             self.criterion = nn.CrossEntropyLoss(weight=weight)
@@ -80,16 +80,16 @@ class GestureModule(LightningModule):
         x, y = batch
         output = self.model(x)
         loss = self.criterion(output, y)
-        self.val_accuracy(output, y)
-        self.val_micro_f1(output, y)
-        self.val_macro_f1(output, y)
+        self.valid_accuracy(output, y)
+        self.valid_micro_f1(output, y)
+        self.valid_macro_f1(output, y)
         preds = torch.argmax(output, dim=1)
         self.confusion_matrix.update(preds, y)
 
         self.log(f'valid loss', loss, prog_bar=True, sync_dist=True)
-        self.log(f'valid accuracy', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log(f'valid micro f1', self.val_micro_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log(f'valid macro f1', self.val_macro_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f'valid accuracy', self.valid_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f'valid micro f1', self.valid_micro_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f'valid macro f1', self.valid_macro_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         return loss
 
     def on_validation_epoch_end(self):
@@ -100,9 +100,9 @@ class GestureModule(LightningModule):
             matrix_str = np.array2string(confusion_np, separator=" ")
         self.print(f"\nValidation confusion matrix:\n{matrix_str}")
         self.confusion_matrix.reset()
-        self.val_accuracy.reset()
-        self.val_micro_f1.reset()
-        self.val_macro_f1.reset()
+        self.valid_accuracy.reset()
+        self.valid_micro_f1.reset()
+        self.valid_macro_f1.reset()
 
     def configure_optimizers(self) -> optim.Optimizer:
         optimizer = optim.Adam(self.parameters(), lr=self.config.lr, eps=self.config.eps)
@@ -121,7 +121,7 @@ def train(config: str):
     trainer = Trainer(
         accelerator='gpu',
         devices=1,
-        max_epochs=-1,
+        max_epochs=config.epoch,
         callbacks=[ ModelCheckpoint(every_n_epochs=20, save_top_k=1), ],
         default_root_dir='./log',
         logger=logger,

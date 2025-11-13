@@ -31,9 +31,7 @@ def get_model(config) -> nn.Module:
             n_input_filters=32,
         )
 
-def load_model_from_checkpoint(config: TrainConfig, checkpoint: dict) -> nn.Module:
-    model = get_model(config)
-
+def load_state_dict_from_checkpoint(checkpoint: dict) -> dict:
     state_dict = checkpoint['state_dict']
     new_state_dict = {}
 
@@ -45,16 +43,32 @@ def load_model_from_checkpoint(config: TrainConfig, checkpoint: dict) -> nn.Modu
                 new_key = key
             new_state_dict[new_key] = value
 
-    model.load_state_dict(new_state_dict)
+    return new_state_dict
+
+def load_model_from_checkpoint(config: TrainConfig, checkpoint: dict) -> nn.Module:
+    model = get_model(config)
+    model.load_state_dict(load_state_dict_from_checkpoint(checkpoint))
+    # state_dict = checkpoint['state_dict']
+    # new_state_dict = {}
+
+    # for key, value in state_dict.items():
+    #     if not any(unwanted in key for unwanted in ['criterion', 'optimizer', 'scheduler']):
+    #         if key.startswith('model.'):
+    #             new_key = key[6:]
+    #         else:
+    #             new_key = key
+    #         new_state_dict[new_key] = value
+
+    # model.load_state_dict(new_state_dict)
 
     return model
 
 def use_pretrained_model(model: nn.Module, config: ExpBaselineTrainConfig) -> nn.Module:
     pretrained_config = deepcopy(config)
     pretrained_config.num_classes = 27
-    pretrained_model = load_model_from_checkpoint(pretrained_config, torch.load(config.pretrained_checkpoint_path))
-    
-    pretrained_state_dict = pretrained_model.state_dict()
+    # pretrained_model = load_model_from_checkpoint(pretrained_config, torch.load(config.pretrained_checkpoint_path))
+    # pretrained_state_dict = pretrained_model.state_dict()
+    pretrained_state_dict = load_state_dict_from_checkpoint(torch.load(config.pretrained_checkpoint_path))
     model_state_dict = model.state_dict()
   
     filtered_state_dict = {}
@@ -70,10 +84,13 @@ def use_pretrained_model(model: nn.Module, config: ExpBaselineTrainConfig) -> nn
     
     model.load_state_dict(filtered_state_dict, strict=False)
     
+    return model
+
+def freeze_model(model: nn.Module) -> nn.Module:
     for name, param in model.named_parameters():
         if not name.startswith('fc.'):
             param.requires_grad = False
         else:
             param.requires_grad = True
-    
     return model
+    

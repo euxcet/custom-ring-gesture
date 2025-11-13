@@ -1,4 +1,4 @@
-name: exp_baseline_senselitev2
+name: exp_baseline_50_samples
 
 model:
   name: SenseLiteV2
@@ -25,10 +25,8 @@ labels: [ none, wave_right, wave_down, wave_left, wave_up, tap_air, tap_plane, p
         touch_down, touch_ring, long_touch_ring, spread_ring]
 
 custom_labels: [ none, pinch, middle_pinch, circle_clockwise, circle_counterclockwise, clap, snap ]
-custom_num_samples: [100000, 5, 5, 5, 5, 5, 5]
-# custom_num_samples: [100000, 500, 10, 10, 10, 10, 10]
-# pretrained_checkpoint_path: './pretrained/pretrained_senselitev2.ckpt'
-pretrained_checkpoint_path: './pretrained/pretrained_v4.ckpt'
+custom_num_samples: [100000, 50, 50, 50, 50, 50, 50]
+pretrained_checkpoint_path: './pretrained/pretrained_senselitev2.ckpt'
 
 use_pretrained_model: True
 do_aug: False

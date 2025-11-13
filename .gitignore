@@ -39,3 +39,7 @@ tb_logs/
 pretrained/
 visual_result/
 vae_logs/
+*.pth
+*.pt
+*.ckpt
+export_models/

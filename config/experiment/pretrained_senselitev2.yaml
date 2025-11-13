@@ -5,6 +5,7 @@ model:
   input_channels: 6
   depth: 6
 
+epoch: 1000
 lr: 1e-3
 eps: 1e-8
 device: 'cuda'
@@ -21,22 +22,32 @@ labels: [ none, wave_right, wave_down, wave_left, wave_up, tap_air, tap_plane, p
         pinch_down, pinch_up, boom, tap_up, throw, touch_left, touch_right, slide_up,
         slide_down, slide_left, slide_right, aid_slide_left, aid_slide_right, touch_up,
         touch_down, touch_ring, long_touch_ring, spread_ring]
+
+# 0
 # use_labels: [ none, wave_right, wave_down, wave_left, wave_up, tap_air, tap_plane, push_forward,
-#         clench, flip, wrist_clockwise, wrist_counterclockwise, 
-#         thumb_up, index_flick, touch_plane,
+#         pinch, clench, flip, wrist_clockwise, wrist_counterclockwise, circle_clockwise,
+#         circle_counterclockwise, clap, snap, thumb_up, middle_pinch, index_flick, touch_plane,
 #         thumb_tap_index, index_bend_and_straighten, ring_pinch, pinky_pinch, slide_plane,
 #         pinch_down, pinch_up, boom, tap_up, throw, touch_left, touch_right, slide_up,
 #         slide_down, slide_left, slide_right, aid_slide_left, aid_slide_right, touch_up,
 #         touch_down, touch_ring, long_touch_ring, spread_ring]
+
+# 1
 # use_labels: [ none, wave_right, wave_down, wave_left, wave_up, tap_air, tap_plane, push_forward,
-#         pinch, clench, flip, wrist_clockwise, wrist_counterclockwise, circle_clockwise,
-#         circle_counterclockwise, clap, snap, thumb_up, middle_pinch, index_flick, touch_plane,
+#         pinch, clench, flip, wrist_clockwise, wrist_counterclockwise, circle_clockwise, circle_counterclockwise,
+#         clap, snap, thumb_up, middle_pinch, index_flick, touch_plane,
 #         pinch_down, pinch_up, boom, slide_up, slide_down, slide_left, slide_right, aid_slide_left,
 #         aid_slide_right, touch_up, touch_down, touch_ring]
 
+# 2
 use_labels: [ none, wave_right, wave_down, wave_left, wave_up, tap_air, tap_plane, push_forward,
         clench, flip, wrist_clockwise, wrist_counterclockwise, thumb_up, index_flick, touch_plane,
         pinch_down, pinch_up, boom, slide_up, slide_down, slide_left, slide_right, aid_slide_left,
         aid_slide_right, touch_up, touch_down, touch_ring]
 
-# pinch, middle_pinch, circle_clockwise, circle_counterclockwise, clap, snap 
+# 3
+# use_labels: [ none, thumb_up, index_flick, touch_plane, pinch_down, pinch_up, boom, slide_up, slide_down,
+#         slide_left, slide_right, aid_slide_left, aid_slide_right, touch_up, touch_down, touch_ring, long_touch_ring, spread_ring]
+
+# 4
+# use_labels: [ none, thumb_up, index_flick, touch_plane, pinch_down, pinch_up, boom, slide_up, slide_down ]
