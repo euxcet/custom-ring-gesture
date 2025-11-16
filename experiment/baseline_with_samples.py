@@ -23,35 +23,27 @@ from lightning.pytorch.callbacks import (
 
 from torchmetrics.classification import Accuracy, F1Score, ConfusionMatrix
 
-from model import get_model, use_pretrained_model, freeze_model
-from dataset.exp_baseline_dataset import ExpBaselineDataset
+from model import get_model, use_pretrained_model, freeze_model, load_model_from_checkpoint
+from dataset.exp_baseline_with_samples_dataset import ExpBaselineWithSamplesDataset
 from utils.config import ExpBaselineTrainConfig
 from utils.train_utils import get_labels_id
 
 # torch.set_float32_matmul_precision("medium")
 
 class ExpBaselineDataModule(LightningDataModule):
-    def __init__(self, config: ExpBaselineTrainConfig):
+    def __init__(self, config: ExpBaselineTrainConfig, samples: list[list[torch.Tensor]]):
         super().__init__()
-        custom_labels_id = get_labels_id(config.labels, config.custom_labels)
         self.config = config
-        self.train_dataset = ExpBaselineDataset(
+        self.train_dataset = ExpBaselineWithSamplesDataset(
             dataset_type='train',
             x_files=config.train_x_files,
             y_files=config.train_y_files,
-            custom_labels_id=custom_labels_id,
-            custom_num_samples=config.custom_num_samples,
+            samples=samples,
             do_aug=config.do_aug,
             do_vae_aug=config.do_vae_aug,
             vae_model_path=config.vae_model_path,
             vae_latent_dim=config.vae_latent_dim,
             do_repeat=config.do_repeat,
-        )
-        self.valid_dataset = ExpBaselineDataset(
-            dataset_type='valid',
-            x_files=config.valid_x_files,
-            y_files=config.valid_y_files,
-            custom_labels_id=custom_labels_id,
         )
     
     def setup(self, stage):
@@ -60,8 +52,6 @@ class ExpBaselineDataModule(LightningDataModule):
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.config.batch_size, num_workers=8, shuffle=True, persistent_workers=True)
 
-    def val_dataloader(self):
-        return DataLoader(self.valid_dataset, batch_size=self.config.batch_size, num_workers=8, shuffle=False, persistent_workers=True)
 
 class ExpBaselineModule(LightningModule):
     def __init__(self, config: ExpBaselineTrainConfig, weight: torch.Tensor):
@@ -73,14 +63,9 @@ class ExpBaselineModule(LightningModule):
         if config.do_freeze_model:
             self.model = freeze_model(self.model)
         self.train_accuracy = Accuracy(task="multiclass", num_classes=config.num_classes)
-        self.valid_accuracy = Accuracy(task="multiclass", num_classes=config.num_classes)
         self.train_micro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="micro")
         self.train_macro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="macro")
-        self.valid_micro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="micro")
-        self.valid_macro_f1 = F1Score(task="multiclass", num_classes=config.num_classes, average="macro")
-        # confusion matrices for train and valid
         self.train_confmat = ConfusionMatrix(task="multiclass", num_classes=config.num_classes)
-        self.valid_confmat = ConfusionMatrix(task="multiclass", num_classes=config.num_classes)
 
         if config.balance_samples:
             self.criterion = nn.CrossEntropyLoss(weight=weight)
@@ -118,35 +103,6 @@ class ExpBaselineModule(LightningModule):
         self.train_macro_f1.reset()
         self.train_confmat.reset()
 
-    def validation_step(self, batch: tuple[torch.Tensor, torch.Tensor]):
-        x, y = batch
-        output = self.model(x)
-        loss = self.criterion(output, y)
-        self.valid_accuracy(output, y)
-        self.valid_micro_f1(output, y)
-        self.valid_macro_f1(output, y)
-        self.valid_confmat.update(output, y)
-
-        self.log(f'valid loss', loss, prog_bar=True, sync_dist=True)
-        self.log(f'valid accuracy', self.valid_accuracy, prog_bar=True, sync_dist=True)
-        self.log(f'valid micro f1', self.valid_micro_f1, prog_bar=False, sync_dist=True)
-        self.log(f'valid macro f1', self.valid_macro_f1, prog_bar=False, sync_dist=True)
-        return loss
-
-    def on_validation_epoch_end(self):
-        try:
-            valid_cm = self.valid_confmat.compute()
-            print("\n========== Valid Confusion Matrix ==========")
-            print(valid_cm.cpu().numpy())
-            print("===========================================\n")
-        except Exception as e:
-            print(f"Failed to compute valid confusion matrix: {e}")
-
-        self.valid_accuracy.reset()
-        self.valid_micro_f1.reset()
-        self.valid_macro_f1.reset()
-        self.valid_confmat.reset()
-    
     def configure_optimizers(self) -> optim.Optimizer:
         optimizer = optim.Adam(self.parameters(), lr=self.config.lr, eps=self.config.eps)
         return optimizer
@@ -155,9 +111,10 @@ def setdefault(config, attr, value) -> None:
     if not hasattr(config, attr):
         setattr(config, attr, value)
 
-def train(config: str):
+def train(config: str, samples: list[list[torch.Tensor]]):
     config: ExpBaselineTrainConfig = ExpBaselineTrainConfig.from_yaml(config)
-    data_module = ExpBaselineDataModule(config)
+    config.num_classes = len(samples) + 1
+    data_module = ExpBaselineDataModule(config, samples)
     gesture_module = ExpBaselineModule(config, weight=data_module.train_dataset.weight)
     logger = TensorBoardLogger("tb_logs", name=config.name)
     trainer = Trainer(
@@ -170,6 +127,21 @@ def train(config: str):
     )
     tuner = Tuner(trainer)
     trainer.fit(model=gesture_module, datamodule=data_module)
+    
+    # save final trained model
+    export_dir = project_root / "export_models"
+    export_dir.mkdir(parents=True, exist_ok=True)
+    export_path = export_dir / "model.cpkt"
+    trainer.save_checkpoint(str(export_path), weights_only=False)
+    print(f"Final checkpoint saved to {export_path}")
+    
+    if config.use_pretrained_model:
+        config.pretrained_checkpoint_path = export_path
+        model = load_model_from_checkpoint(config, torch.load('export_models/model.cpkt'))
+        # save model
+        export_model_path = export_dir / "model.pth"
+        torch.save(model.state_dict(), export_model_path)
+        print(f"Final model saved to {export_model_path}")
 
 if __name__ == '__main__':
     Fire(train)

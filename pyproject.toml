@@ -5,13 +5,16 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "fastapi>=0.121.2",
     "fire>=0.7.1",
     "lightning>=2.5.5",
     "matplotlib>=3.10.7",
     "numpy>=2.3.4",
     "omegaconf>=2.3.0",
+    "python-multipart>=0.0.20",
     "scikit-learn>=1.7.2",
     "tensorboard>=2.20.0",
     "tensorboardx>=2.6.4",
     "torch>=2.9.0",
+    "uvicorn>=0.38.0",
 ]

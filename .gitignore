@@ -43,3 +43,4 @@ vae_logs/
 *.pt
 *.ckpt
 export_models/
+*.npy
